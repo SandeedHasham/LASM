@@ -8,8 +8,6 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 
-import "hardhat/console.sol";
-
 
 contract Crowdsale is Context, ReentrancyGuard {
     using SafeMath for uint256;
@@ -27,23 +25,30 @@ contract Crowdsale is Context, ReentrancyGuard {
     // So, if you are using a rate of 1 with a ERC20Detailed token with 3 decimals called TOK
     // 1 wei will give you 1 unit, or 0.001 TOK.
     uint256 private _rate;
+    uint256 public min;
+    uint256 public max;
 
     // Amount of wei raised
     uint256 private _weiRaised;
+    uint256 private _tokenPurchased;
+    bool public success;
+    bool public finalized;
 
     
     event TokensPurchased(address indexed purchaser, address indexed beneficiary, uint256 value, uint256 amount);
 
     
     
-    mapping (address => uint) purchase;
+    mapping (address => uint256) purchase;
+    mapping (address => uint256) msgValue;
     uint256 current = block.timestamp * 1 seconds;
     uint256 limitationtime = block.timestamp + 7776000   * 1 seconds;
      mapping(address => bool) private _whitelist;
     // address[] private _whitelist;
     //  bool public isFinalized = false;
     //  Manager manager;
-    constructor (address[] memory accounts,uint256 rate_, address payable wallet_, IERC20 token_, address payable manager_) {
+    constructor (address[] memory accounts,uint256 rate_, address payable wallet_, IERC20 token_, address payable manager_,
+    uint256 _min , uint256 _max) {
         require(rate_ > 0, "Crowdsale: rate is 0");
         
         require(address(token_) != address(0), "Crowdsale: token is the zero address");
@@ -55,6 +60,8 @@ contract Crowdsale is Context, ReentrancyGuard {
         _wallet = wallet_;
         _token = token_;
         _manager = manager_;
+        min=_min;
+        max = _max;
       
     }
     // function sale () public{
@@ -69,11 +76,11 @@ contract Crowdsale is Context, ReentrancyGuard {
      * buyTokens directly when purchasing tokens from a contract.
      */
     fallback () external payable {
-        buyTokens(_msgSender());
+        buyTokens();
     }
 
     receive () external payable {
-        buyTokens(_msgSender());
+        buyTokens();
     }
 
     /**
@@ -104,42 +111,43 @@ contract Crowdsale is Context, ReentrancyGuard {
         return _weiRaised;
     }
 
-    /**
-     * @dev low level token purchase ***DO NOT OVERRIDE***
-     * This function has a non-reentrancy guard, so it shouldn't be called by
-     * another `nonReentrant` function.
-     * @param beneficiary Recipient of the token purchase
-     */
-    function buyTokens(address beneficiary) public nonReentrant payable {
-        require (_whitelist[_msgSender()] == true);
+    
+    function buyTokens() public nonReentrant payable {
+        require (_whitelist[_msgSender()] == true,"you are not whitelisted");
         require ( limitationtime > block.timestamp, "not running");
-        
-        uint256 weiAmount = msg.value;
-       
 
+        uint256 weiAmount = msg.value;
         // calculate token amount to be created
         uint256 tokens = _getTokenAmount(weiAmount);
+
+        require(address(this).balance >= tokens,"buy amount exceeds");
+        _tokenPurchased = _tokenPurchased + tokens;
 
         // update state
         _weiRaised = _weiRaised.add(weiAmount);
 
-       
-        _updatePurchasingState(beneficiary, weiAmount);
-            purchase[msg.sender]=tokens;
-        _forwardFunds();
+      //  _updatePurchasingState(beneficiary, weiAmount);
+            msgValue[_msgSender()] = msgValue[_msgSender()] + weiAmount;
+            purchase[msg.sender]=purchase[msg.sender]+tokens;
        
     }
 
     function claim() public payable {
+        require (_whitelist[_msgSender()] == true,"you are not whitelisted");
         require (block.timestamp > limitationtime);
 
-    // address investor = msg.sender;
-    
-    uint t = purchase[msg.sender];
-    
-    _processPurchase(msg.sender, t);
-    // if(amount == 0) {
-    //   throw;
+        if(success){
+        uint256 t = purchase[_msgSender()];  
+         _processPurchase(_msgSender(), t);
+         delete purchase[_msgSender()];
+        }
+        else{
+            uint256 eth = msgValue[_msgSender()];
+            payable(_msgSender()).transfer(eth);
+            delete msgValue[_msgSender()];
+        }
+
+   
     }
     function balance() public view returns(uint){
         return _token.balanceOf(address(this));
@@ -147,10 +155,22 @@ contract Crowdsale is Context, ReentrancyGuard {
         // return at.balanceOf(this)
     }
 
-    function takeTokensBack() public  returns(bool) {
-     uint remainingTokensInTheContract = _token.balanceOf(address(this));
-     return _token.transfer(address(_manager),remainingTokensInTheContract);
-       //selfdestruct(payable (address(this)));
+    function Finalize() public  returns(bool) {
+        require( limitationtime < block.timestamp, "the crowdSale is in progress");
+        require(!finalized,"already finalized");
+        if(_weiRaised >= min ){
+            success = true;
+            uint256 remainingTokensInTheContract = _token.balanceOf(address(this)) - _tokenPurchased;
+            _token.transfer(address(_manager),remainingTokensInTheContract);
+            _forwardFunds();
+        }
+        else{
+             success = false;
+             uint256 remainingTokensInTheContract = _token.balanceOf(address(this));
+             _token.transfer(address(_manager),remainingTokensInTheContract);
+        }
+        finalized = true;
+        return success;
     }
 
   

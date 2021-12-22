@@ -36,7 +36,9 @@ contract Manager is Context, Ownable {
         spend=0;
         
     }
-  
+    
+
+    receive () external payable {}
 
     function transferCheck(uint256 amount) internal view returns(bool){
         uint256 current = block.timestamp * 1 seconds;
@@ -75,24 +77,22 @@ contract Manager is Context, Ownable {
          spend = spend + amount;
     }
 
-    function create_Presale(address[] memory accounts,uint rate,address payable wallet_ ) public{
+    function create_Presale(address[] memory accounts,uint rate,address payable wallet_ ,uint256 min ,uint256 max) public onlyOwner{
        Crowdsale preSale;
-       preSale = new Crowdsale(accounts,rate,wallet_,IERC20(address(token)),payable (address(this)));
+       preSale = new Crowdsale(accounts,rate,wallet_,IERC20(address(token)),payable (address(this)),min,max);
         psale = (cap*3)/100;
        presale_addr = address(preSale);
        transfer (presale_addr,psale);
     }
 
-    function create_ICO(address[] memory accounts,uint rate,address payable wallet)public{
+    function create_ICO(address[] memory accounts,uint rate,address payable wallet,uint256 min ,uint256 max)public onlyOwner{
         Crowdsale ico;
-        ico = new Crowdsale(accounts,rate,wallet,IERC20(address(token)),payable (address(this)));
+        ico = new Crowdsale(accounts,rate,wallet,IERC20(address(token)),payable (address(this)),min,max);
         psale = (cap*12)/100;
         ico_addr = address(ico);
     } 
 
-      receive() payable external{
-
-    } 
+     
 
 }
 
