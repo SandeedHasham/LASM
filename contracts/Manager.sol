@@ -77,19 +77,22 @@ contract Manager is Context, Ownable {
          spend = spend + amount;
     }
 
-    function create_Presale(address[] memory accounts,uint rate,address payable wallet_ ,uint256 min ,uint256 max) public onlyOwner{
+   function create_Presale(address[] memory accounts,uint rate,address payable wallet_ ,uint256 min) public onlyOwner{
        Crowdsale preSale;
-       preSale = new Crowdsale(accounts,rate,wallet_,IERC20(address(token)),payable (address(this)),min,max);
-        psale = (cap*3)/100;
+       psale = (cap*3)/100;
+       preSale = new Crowdsale(accounts,rate,wallet_,IERC20(address(token)),payable (address(this)),min,psale);    
        presale_addr = address(preSale);
        transfer (presale_addr,psale);
     }
 
-    function create_ICO(address[] memory accounts,uint rate,address payable wallet,uint256 min ,uint256 max)public onlyOwner{
+    function create_ICO(address[] memory accounts,uint rate,address payable wallet,uint256 min)public onlyOwner{
         Crowdsale ico;
-        ico = new Crowdsale(accounts,rate,wallet,IERC20(address(token)),payable (address(this)),min,max);
         psale = (cap*12)/100;
+        ico = new Crowdsale(accounts,rate,wallet,IERC20(address(token)),payable (address(this)),min,psale);
         ico_addr = address(ico);
+        transfer (ico_addr,psale);
+    } 
+    
     } 
 
      

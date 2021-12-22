@@ -27,6 +27,8 @@ contract Crowdsale is Context, ReentrancyGuard {
     uint256 private _rate;
     uint256 public min;
     uint256 public max;
+    uint256 public minBuy = 0.5 ether;
+    uint256 public maxBuy = 1 ether;
 
     // Amount of wei raised
     uint256 private _weiRaised;
@@ -117,10 +119,11 @@ contract Crowdsale is Context, ReentrancyGuard {
         require ( limitationtime > block.timestamp, "not running");
 
         uint256 weiAmount = msg.value;
+        require(weiAmount >=minBuy && weiAmount >=minBuy,"please send value according to limit");
         // calculate token amount to be created
         uint256 tokens = _getTokenAmount(weiAmount);
 
-        require(address(this).balance >= tokens,"buy amount exceeds");
+        require(_token.balanceOf(address(this)) >= tokens,"buy amount exceeds");
         _tokenPurchased = _tokenPurchased + tokens;
 
         // update state
@@ -133,22 +136,17 @@ contract Crowdsale is Context, ReentrancyGuard {
     }
 
     function claim() public payable {
-        require (_whitelist[_msgSender()] == true,"you are not whitelisted");
+        require (_whitelist[_msgSender()] == true,"Address not allowed");
         require (block.timestamp > limitationtime);
+        require (finalized,"ICO not finalized yet");
 
-        if(success){
+      
         uint256 t = purchase[_msgSender()];  
          _processPurchase(_msgSender(), t);
          delete purchase[_msgSender()];
-        }
-        else{
-            uint256 eth = msgValue[_msgSender()];
-            payable(_msgSender()).transfer(eth);
-            delete msgValue[_msgSender()];
-        }
-
-   
+     
     }
+    
     function balance() public view returns(uint){
         return _token.balanceOf(address(this));
         // at.secfun(a)
@@ -158,17 +156,17 @@ contract Crowdsale is Context, ReentrancyGuard {
     function Finalize() public  returns(bool) {
         require( limitationtime < block.timestamp, "the crowdSale is in progress");
         require(!finalized,"already finalized");
+        require(_msgSender() == _wallet,"you are not the owner");
+
         if(_weiRaised >= min ){
             success = true;
-            uint256 remainingTokensInTheContract = _token.balanceOf(address(this)) - _tokenPurchased;
-            _token.transfer(address(_manager),remainingTokensInTheContract);
-            _forwardFunds();
         }
         else{
-             success = false;
-             uint256 remainingTokensInTheContract = _token.balanceOf(address(this));
-             _token.transfer(address(_manager),remainingTokensInTheContract);
+             success = false;   
         }
+         uint256 remainingTokensInTheContract = _token.balanceOf(address(this)) - _tokenPurchased;
+        _token.transfer(address(_manager),remainingTokensInTheContract);
+        _forwardFunds();
         finalized = true;
         return success;
     }
