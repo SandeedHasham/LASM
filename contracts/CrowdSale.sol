@@ -119,7 +119,7 @@ contract Crowdsale is Context, ReentrancyGuard {
         require ( limitationtime > block.timestamp, "not running");
 
         uint256 weiAmount = msg.value;
-        require(weiAmount >=minBuy && weiAmount >=minBuy,"please send value according to limit");
+        require(weiAmount >=minBuy && weiAmount <=maxBuy,"please send value according to limit");
         // calculate token amount to be created
         uint256 tokens = _getTokenAmount(weiAmount);
 
